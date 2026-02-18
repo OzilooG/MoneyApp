@@ -5,53 +5,58 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 export default function MyMoneyPage() {
   const [balance, setBalance] = useState(0);
+  const [savings, setSavings] = useState(0);
   const [amount, setAmount] = useState("");
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
 
   // Load logged-in user info
   useEffect(() => {
     const storedName = localStorage.getItem("userName");
-    if (storedName) {
-      setUserName(storedName);
+    if (!storedName) {
+      window.location.href = "/";
+      return;
+    }
 
-      // Load this user's balance and transactions
-      const userDataRaw = localStorage.getItem(`user-${storedName}`);
-      if (userDataRaw) {
-        const userData = JSON.parse(userDataRaw);
-        setBalance(userData.balance || 0);
-        setTransactions(userData.transactions || []);
-      }
+    setUserName(storedName);
+
+    const userDataRaw = localStorage.getItem(`user-${storedName}`);
+    if (userDataRaw) {
+      const userData = JSON.parse(userDataRaw);
+      setBalance(userData.balance || 0);
+      setSavings(userData.savings || 0);
+      setTransactions(userData.transactions || []);
     }
   }, []);
 
-  // Save to localStorage per user - PRESERVE THE PIN!
+  // Save updates per user (PRESERVE PIN)
   useEffect(() => {
     if (!userName) return;
 
-    // Get existing user data first
-    const existingDataRaw = localStorage.getItem(`user-${userName}`);
-    if (existingDataRaw) {
-      const existingData = JSON.parse(existingDataRaw);
-      
-      // Merge new data with existing data, preserving the pin
-      const userData = { 
+    const existingRaw = localStorage.getItem(`user-${userName}`);
+    if (!existingRaw) return;
+
+    const existingData = JSON.parse(existingRaw);
+
+    localStorage.setItem(
+      `user-${userName}`,
+      JSON.stringify({
         ...existingData,
-        balance, 
-        transactions 
-      };
-      
-      localStorage.setItem(`user-${userName}`, JSON.stringify(userData));
-    }
-  }, [balance, transactions, userName]);
+        balance,
+        savings,
+        transactions,
+      })
+    );
+  }, [balance, savings, transactions, userName]);
 
   const value = Number(amount);
 
-  function handleTransaction(type) {
+  function handleTransaction(type: "add" | "subtract") {
     setError("");
 
     if (!amount || value <= 0) {
@@ -73,7 +78,7 @@ export default function MyMoneyPage() {
         id: crypto.randomUUID(),
         type,
         amount: value,
-        date: new Date().toLocaleString(),
+        date: new Date().toISOString(),
       },
       ...transactions,
     ]);
@@ -81,17 +86,27 @@ export default function MyMoneyPage() {
     setAmount("");
   }
 
+  // Calculate spent this month
+  const spentThisMonth = transactions
+    .filter(
+      (t) =>
+        t.type === "subtract" &&
+        new Date(t.date).getMonth() === new Date().getMonth() &&
+        new Date(t.date).getFullYear() === new Date().getFullYear()
+    )
+    .reduce((sum, t) => sum + t.amount, 0);
+
   return (
     <div className="min-h-screen bg-slate-900 p-6 flex justify-center">
       <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center">
-        <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-bold text-white">
           Welcome back{userName ? `, ${userName}` : ""} 👋
         </h1>
 
         <button
           onClick={() => {
-            localStorage.removeItem("isLoggedIn");
             localStorage.removeItem("userName");
+            localStorage.removeItem("isLoggedIn");
             window.location.href = "/";
           }}
           className="mt-2 text-sm text-red-300 hover:text-red-400 underline"
@@ -100,10 +115,45 @@ export default function MyMoneyPage() {
         </button>
       </div>
 
-      <div className="w-full max-w-lg space-y-6 mt-28">
-        <Card className="rounded-2xl shadow-xl">
+      <div className="w-full max-w-5xl space-y-6 mt-28">
+        {/* SUMMARY CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/balance">
+            <Card className="cursor-pointer hover:shadow-xl transition">
+              <CardContent className="p-6 text-center">
+                <h2 className="text-lg font-semibold">Balance</h2>
+                <p className="text-3xl font-bold">€{balance.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/savings">
+            <Card className="cursor-pointer hover:shadow-xl transition">
+              <CardContent className="p-6 text-center">
+                <h2 className="text-lg font-semibold">Savings</h2>
+                <p className="text-3xl font-bold text-blue-600">
+                  €{savings.toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/spent">
+            <Card className="cursor-pointer hover:shadow-xl transition">
+              <CardContent className="p-6 text-center">
+                <h2 className="text-lg font-semibold">Spent This Month</h2>
+                <p className="text-3xl font-bold text-red-600">
+                  €{spentThisMonth.toFixed(2)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* MAIN BALANCE CARD */}
+        <Card>
           <CardContent className="p-6 text-center space-y-2">
-            <h1 className="text-2xl font-semibold">My Balance</h1>
+            <h1 className="text-2xl font-semibold">Quick Transaction</h1>
             <motion.p
               key={balance}
               initial={{ scale: 0.9, opacity: 0 }}
@@ -115,6 +165,7 @@ export default function MyMoneyPage() {
           </CardContent>
         </Card>
 
+        {/* TRANSACTION INPUT */}
         <Card>
           <CardContent className="p-6 space-y-4">
             <Input
@@ -144,9 +195,10 @@ export default function MyMoneyPage() {
           </CardContent>
         </Card>
 
+        {/* RECENT ACTIVITY */}
         <Card>
           <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Transaction History</h2>
+            <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
 
             <AnimatePresence>
               {transactions.length === 0 && (
@@ -163,7 +215,9 @@ export default function MyMoneyPage() {
                 >
                   <div>
                     <p className="font-medium capitalize">{t.type}</p>
-                    <p className="text-xs text-gray-500">{t.date}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(t.date).toLocaleString()}
+                    </p>
                   </div>
                   <p
                     className={`font-semibold ${
