@@ -1,237 +1,141 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function MyMoneyPage() {
+export default function MainPage() {
+  const router = useRouter();
   const [balance, setBalance] = useState(0);
   const [savings, setSavings] = useState(0);
-  const [amount, setAmount] = useState("");
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [error, setError] = useState("");
+  const [spent, setSpent] = useState(0);
   const [userName, setUserName] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Load logged-in user info
   useEffect(() => {
-    const storedName = localStorage.getItem("userName");
-    if (!storedName) {
-      window.location.href = "/";
+    const name = localStorage.getItem("userName");
+    if (!name) {
+      router.push("/");
       return;
     }
 
-    setUserName(storedName);
+    setUserName(name);
 
-    const userDataRaw = localStorage.getItem(`user-${storedName}`);
-    if (userDataRaw) {
-      const userData = JSON.parse(userDataRaw);
-      setBalance(userData.balance || 0);
-      setSavings(userData.savings || 0);
-      setTransactions(userData.transactions || []);
-    }
+    const raw = localStorage.getItem(`user-${name}`);
+    if (!raw) return;
+
+    const data = JSON.parse(raw);
+
+    setBalance(data.balance || 0);
+    setSavings(data.savings || 0);
+
+    const spentTotal = (data.transactions || [])
+      .filter((t: any) => t.type === "subtract")
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+    setSpent(spentTotal);
   }, []);
 
-  // Save updates per user (PRESERVE PIN)
-  useEffect(() => {
-    if (!userName) return;
-
-    const existingRaw = localStorage.getItem(`user-${userName}`);
-    if (!existingRaw) return;
-
-    const existingData = JSON.parse(existingRaw);
-
-    localStorage.setItem(
-      `user-${userName}`,
-      JSON.stringify({
-        ...existingData,
-        balance,
-        savings,
-        transactions,
-      })
-    );
-  }, [balance, savings, transactions, userName]);
-
-  const value = Number(amount);
-
-  function handleTransaction(type: "add" | "subtract") {
-    setError("");
-
-    if (!amount || value <= 0) {
-      setError("Enter a valid amount greater than 0");
-      return;
-    }
-
-    if (type === "subtract" && value > balance) {
-      setError("Insufficient balance");
-      return;
-    }
-
-    const newBalance = type === "add" ? balance + value : balance - value;
-
-    setBalance(newBalance);
-
-    setTransactions([
-      {
-        id: crypto.randomUUID(),
-        type,
-        amount: value,
-        date: new Date().toISOString(),
-      },
-      ...transactions,
-    ]);
-
-    setAmount("");
+  // Text-to-speech
+  function speak(text: string) {
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.rate = 0.9;
+    window.speechSynthesis.speak(msg);
   }
 
-  // Calculate spent this month
-  const spentThisMonth = transactions
-    .filter(
-      (t) =>
-        t.type === "subtract" &&
-        new Date(t.date).getMonth() === new Date().getMonth() &&
-        new Date(t.date).getFullYear() === new Date().getFullYear()
-    )
-    .reduce((sum, t) => sum + t.amount, 0);
+  // Logout
+  function logout() {
+    localStorage.removeItem("userName");
+    localStorage.removeItem("isLoggedIn");
+    speak("You have been logged out");
+    router.push("/");
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6 flex justify-center">
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center">
-        <h1 className="text-3xl md:text-4xl font-bold text-white">
-          Welcome back{userName ? `, ${userName}` : ""} 👋
+    <div className="min-h-screen bg-slate-900 p-6 relative">
+      <div className="flex justify-between items-center mb-6 max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold text-white">
+          Hello {userName} 👋
         </h1>
-
-        <button
-          onClick={() => {
-            localStorage.removeItem("userName");
-            localStorage.removeItem("isLoggedIn");
-            window.location.href = "/";
-          }}
-          className="mt-2 text-sm text-red-300 hover:text-red-400 underline"
+        <Button
+          className="bg-red-600 hover:bg-red-700 text-white"
+          onClick={() => setShowLogoutConfirm(true)}
         >
-          Log out
-        </button>
+          🚪 Log Out
+        </Button>
       </div>
 
-      <div className="w-full max-w-5xl space-y-6 mt-28">
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/balance">
-            <Card className="cursor-pointer hover:shadow-xl transition">
-              <CardContent className="p-6 text-center">
-                <h2 className="text-lg font-semibold">Balance</h2>
-                <p className="text-3xl font-bold">€{balance.toFixed(2)}</p>
-              </CardContent>
-            </Card>
-          </Link>
+      <div className="grid gap-8 max-w-4xl mx-auto">
 
-          <Link href="/savings">
-            <Card className="cursor-pointer hover:shadow-xl transition">
-              <CardContent className="p-6 text-center">
-                <h2 className="text-lg font-semibold">Savings</h2>
-                <p className="text-3xl font-bold text-blue-600">
-                  €{savings.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/spent">
-            <Card className="cursor-pointer hover:shadow-xl transition">
-              <CardContent className="p-6 text-center">
-                <h2 className="text-lg font-semibold">Spent This Month</h2>
-                <p className="text-3xl font-bold text-red-600">
-                  €{spentThisMonth.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* MAIN BALANCE CARD */}
-        <Card>
-          <CardContent className="p-6 text-center space-y-2">
-            <h1 className="text-2xl font-semibold">Quick Transaction</h1>
-            <motion.p
-              key={balance}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="text-4xl font-bold"
-            >
-              €{balance.toFixed(2)}
-            </motion.p>
+        {/* BALANCE CARD */}
+        <Card
+          className="cursor-pointer hover:scale-[1.02] transition"
+          onClick={() => {
+            speak(`Your total money is ${balance.toFixed(2)} euros`);
+            router.push("/balance");
+          }}
+        >
+          <CardContent className="p-10 text-center">
+            <h2 className="text-2xl font-semibold">💰 My Money</h2>
+            <p className="text-5xl font-bold mt-4">€{balance.toFixed(2)}</p>
+            <p className="text-lg mt-2 text-gray-600">Tap to manage your money</p>
           </CardContent>
         </Card>
 
-        {/* TRANSACTION INPUT */}
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <Input
-              type="number"
-              placeholder="Enter amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+        {/* SAVINGS CARD */}
+        <Card
+          className="cursor-pointer hover:scale-[1.02] transition border-4 border-green-500"
+          onClick={() => speak(`You have saved ${savings.toFixed(2)} euros`)}
+        >
+          <Link href="/savings" className="block">
+            <CardContent className="p-10 text-center">
+              <h2 className="text-2xl font-semibold">💎 My Savings</h2>
+              <p className="text-5xl font-bold mt-4 text-green-700">€{savings.toFixed(2)}</p>
+              <p className="text-lg mt-2 text-gray-600">This money is protected</p>
+            </CardContent>
+          </Link>
+        </Card>
 
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+        {/* SPENDING CARD */}
+        <Card
+          className="cursor-pointer hover:scale-[1.02] transition border-4 border-red-500"
+          onClick={() => speak(`You have spent ${spent.toFixed(2)} euros`)}
+        >
+          <Link href="/spent" className="block">
+            <CardContent className="p-10 text-center">
+              <h2 className="text-2xl font-semibold">🧾 Money I Spent</h2>
+              <p className="text-5xl font-bold mt-4 text-red-600">€{spent.toFixed(2)}</p>
+              <p className="text-lg mt-2 text-gray-600">Weekly and monthly view</p>
+            </CardContent>
+          </Link>
+        </Card>
 
-            <div className="grid grid-cols-2 gap-4">
+      </div>
+
+      {/* LOGOUT CONFIRM MODAL */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4">
+            <p className="text-xl font-semibold">Are you sure you want to log out?</p>
+            <div className="flex justify-around mt-4">
               <Button
-                className="bg-green-600 hover:bg-green-700"
-                onClick={() => handleTransaction("add")}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2"
+                onClick={logout}
               >
-                Add
+                Yes
               </Button>
-
               <Button
-                className="bg-red-600 hover:bg-red-700"
-                onClick={() => handleTransaction("subtract")}
+                className="bg-gray-300 hover:bg-gray-400 text-black px-6 py-2"
+                onClick={() => setShowLogoutConfirm(false)}
               >
-                Subtract
+                No
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* RECENT ACTIVITY */}
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-
-            <AnimatePresence>
-              {transactions.length === 0 && (
-                <p className="text-gray-500 text-sm">No transactions yet</p>
-              )}
-
-              {transactions.map((t) => (
-                <motion.div
-                  key={t.id}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex justify-between items-center py-2 border-b"
-                >
-                  <div>
-                    <p className="font-medium capitalize">{t.type}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(t.date).toLocaleString()}
-                    </p>
-                  </div>
-                  <p
-                    className={`font-semibold ${
-                      t.type === "add" ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {t.type === "add" ? "+" : "-"}€{t.amount}
-                  </p>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
