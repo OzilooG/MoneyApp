@@ -49,7 +49,6 @@ export default function MainPage() {
   function logout() {
     localStorage.removeItem("userName");
     localStorage.removeItem("isLoggedIn");
-    speak("You have been logged out");
     router.push("/");
   }
 
@@ -60,7 +59,7 @@ export default function MainPage() {
           Hello {userName} 👋
         </h1>
         <Button
-          className="bg-red-600 hover:bg-red-700 text-white"
+          className="bg-red-600 hover:bg-red-700 text-white px-13 py-8"
           onClick={() => setShowLogoutConfirm(true)}
         >
           🚪 Log Out
@@ -71,9 +70,8 @@ export default function MainPage() {
 
         {/* BALANCE CARD */}
         <Card
-          className="cursor-pointer hover:scale-[1.02] transition"
+          className="cursor-pointer hover:scale-[1.02] transition border-4 border-blue-500"
           onClick={() => {
-            speak(`Your total money is ${balance.toFixed(2)} euros`);
             router.push("/balance");
           }}
         >

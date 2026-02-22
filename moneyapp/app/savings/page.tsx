@@ -83,13 +83,13 @@ export default function SavingsPage() {
   const savedAngle = (saved / total) * 360;
 
   return (
-    <div className="min-h-screen bg-indigo-900 p-6 flex justify-center">
+    <div className="min-h-screen bg-slate-900 p-6 flex justify-center">
       <div className="w-full max-w-4xl space-y-8">
 
         {/* BACK */}
         <Button
           onClick={() => router.push("/main")}
-          className="w-full text-2xl py-6 bg-slate-700"
+          className="w-full text-2xl py-16 bg-slate-700"
         >
           ⬅️ Back to Main Menu
         </Button>

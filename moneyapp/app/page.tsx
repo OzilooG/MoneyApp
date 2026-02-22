@@ -34,7 +34,7 @@ function AuthPage() {
   }, []);
 
   const appendPin = (digit: string) => {
-    if (pinInput.length < 6) setPinInput(pinInput + digit);
+    if (pinInput.length < 4) setPinInput(pinInput + digit);
   };
 
   const backspacePin = () => setPinInput(pinInput.slice(0, -1));
@@ -42,8 +42,8 @@ function AuthPage() {
   // Register user
   const onRegister = (data: any) => {
     const trimmedName = data.name.trim();
-    if (!/^\d{6}$/.test(pinInput)) {
-      setMessage("Your PIN must have exactly 6 digits");
+    if (!/^\d{4}$/.test(pinInput)) {
+      setMessage("Your PIN must have exactly 4 digits");
       return;
     }
 
@@ -67,8 +67,8 @@ function AuthPage() {
       return;
     }
 
-    if (!/^\d{6}$/.test(pinInput)) {
-      setMessage("Your PIN must have exactly 6 digits");
+    if (!/^\d{4}$/.test(pinInput)) {
+      setMessage("Your PIN must have exactly 4 digits");
       return;
     }
 
@@ -86,12 +86,7 @@ function AuthPage() {
       return;
     }
 
-    // Debug logging - REMOVE AFTER TESTING
-    console.log("Stored user data:", existingUser);
-    console.log("Stored PIN:", existingUser.pin);
-    console.log("Input PIN:", pinInput);
-    console.log("PIN match:", existingUser.pin === pinInput);
-
+    
     if (!existingUser || !existingUser.pin) {
       setMessage("This account has no valid PIN. Please delete and register again.");
       return;
@@ -124,7 +119,7 @@ function AuthPage() {
 
   // Numpad component
   const Numpad = () => {
-    const digits = ["1","2","3","4","5","6","7","8","9","0"];
+    const digits = ["1","2","3","4","5","6","7","8","9"];
     return (
       <div className="grid grid-cols-3 gap-3 mt-2">
         {digits.map((d) => (
@@ -137,6 +132,17 @@ function AuthPage() {
             {d}
           </button>
         ))}
+        
+      <div /> 
+      <button
+        type="button"
+        onClick={() => appendPin("0")}
+        className="p-6 text-2xl font-bold bg-yellow-200 rounded-lg hover:bg-yellow-300"
+      >
+        0
+      </button>
+      <div /> 
+
         <button
           type="button"
           onClick={backspacePin}
@@ -181,9 +187,9 @@ function AuthPage() {
             />
             {registerErrors.name && <p className="text-red-600 text-base">Please enter your name</p>}
 
-            <label className="block text-lg font-medium">Create 6-digit PIN</label>
+            <label className="block text-lg font-medium">Create 4-digit PIN</label>
             <div className="p-4 border-2 border-gray-400 rounded-xl bg-gray-50 text-2xl text-center">
-              {pinInput || "••••••"}
+              {pinInput || "PIN"}
             </div>
             <Numpad />
 
@@ -225,9 +231,9 @@ function AuthPage() {
               ))}
             </div>
 
-            <label className="block text-lg font-medium mt-4">Enter your 6-digit PIN</label>
+            <label className="block text-lg font-medium mt-4">Enter your 4-digit PIN</label>
             <div className="p-4 border-2 border-gray-400 rounded-xl bg-gray-50 text-2xl text-center">
-              {pinInput || "••••••"}
+              {pinInput || "PIN"}
             </div>
             <Numpad />
 

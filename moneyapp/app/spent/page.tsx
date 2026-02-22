@@ -93,7 +93,6 @@ export default function SpendingPage() {
 
     setTransactions(newTrans);
     saveTransactions(newTrans);
-    speak(`Added ${amount} euro to ${newExpenseCategory}`);
     setNewExpenseAmount("");
     setNewExpenseCategory("Other");
   };
@@ -103,21 +102,19 @@ export default function SpendingPage() {
     if (amount <= 0) return;
     setBudget(amount);
     saveTransactions(transactions, amount);
-    speak(`Budget set to ${amount} euro`);
     setCustomBudget("");
   };
 
   return (
-    <div className="min-h-screen bg-red-900 p-6 flex justify-center">
+    <div className="min-h-screen bg-slate-900 p-6 flex justify-center">
       <div className="w-full max-w-4xl space-y-8">
 
         {/* BACK BUTTON */}
         <Button
           onClick={() => {
-            speak("Going back to main menu");
             router.push("/main");
           }}
-          className="w-full text-2xl py-4 bg-slate-700 hover:bg-slate-600"
+          className="w-full text-2xl py-16 bg-slate-700 hover:bg-slate-600"
         >
           ⬅️ Back to Main Menu
         </Button>

@@ -102,10 +102,9 @@ export default function BalancePage() {
         {/* BACK BUTTON */}
         <Button
           onClick={() => {
-            speak("Going back to main menu");
             router.push("/main");
           }}
-          className="w-full text-2xl py-6 bg-slate-700 hover:bg-slate-600"
+          className="w-full text-2xl py-16 bg-slate-700 hover:bg-slate-600"
         >
           ⬅️ Back to Main Menu
         </Button>
@@ -125,7 +124,6 @@ export default function BalancePage() {
                 key={key}
                 onClick={() => {
                   setActiveCategory(key);
-                  speak(`Add money to ${c.label}`);
                 }}
                 className="cursor-pointer border-4"
               >
