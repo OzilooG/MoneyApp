@@ -91,7 +91,6 @@ export default function MainPage() {
             <CardContent className="p-10 text-center">
               <h2 className="text-2xl font-semibold">💎 My Savings</h2>
               <p className="text-5xl font-bold mt-4 text-green-700">€{savings.toFixed(2)}</p>
-              <p className="text-lg mt-2 text-gray-600">This money is protected</p>
             </CardContent>
           </Link>
         </Card>
@@ -105,7 +104,7 @@ export default function MainPage() {
             <CardContent className="p-10 text-center">
               <h2 className="text-2xl font-semibold">🧾 Money I Spent</h2>
               <p className="text-5xl font-bold mt-4 text-red-600">€{spent.toFixed(2)}</p>
-              <p className="text-lg mt-2 text-gray-600">Weekly and monthly view</p>
+              
             </CardContent>
           </Link>
         </Card>
