@@ -1,138 +1,134 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+
+type MoneyData = {
+  balance: number;
+  savings: number;
+  spent: number;
+};
+
+function readMoneyData(userName: string): MoneyData {
+  const raw = localStorage.getItem(`user-${userName}`);
+  if (!raw) return { balance: 0, savings: 0, spent: 0 };
+
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      balance: Number(parsed?.balance ?? 0),
+      savings: Number(parsed?.savings ?? 0),
+      spent: Number(parsed?.spent ?? 0),
+    };
+  } catch {
+    return { balance: 0, savings: 0, spent: 0 };
+  }
+}
 
 export default function MainPage() {
   const router = useRouter();
-  const [balance, setBalance] = useState(0);
-  const [savings, setSavings] = useState(0);
-  const [spent, setSpent] = useState(0);
-  const [userName, setUserName] = useState("");
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [userName, setUserName] = useState<string>("");
+  const [data, setData] = useState<MoneyData>({ balance: 0, savings: 0, spent: 0 });
 
   useEffect(() => {
-    const name = localStorage.getItem("userName");
+    const name = localStorage.getItem("userName") || "";
     if (!name) {
       router.push("/");
       return;
     }
-
     setUserName(name);
+    setData(readMoneyData(name));
+  }, [router]);
 
-    const raw = localStorage.getItem(`user-${name}`);
-    if (!raw) return;
+  const greeting = useMemo(() => {
+    if (!userName) return "Welcome";
+    return `Welcome, ${userName}`;
+  }, [userName]);
 
-    const data = JSON.parse(raw);
-
-    setBalance(data.balance || 0);
-    setSavings(data.savings || 0);
-
-    const spentTotal = (data.transactions || [])
-      .filter((t: any) => t.type === "subtract")
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-    setSpent(spentTotal);
-  }, []);
-
-  // Text-to-speech
-  function speak(text: string) {
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.rate = 0.9;
-    window.speechSynthesis.speak(msg);
-  }
-
-  // Logout
-  function logout() {
+  const logout = () => {
     localStorage.removeItem("userName");
-    localStorage.removeItem("isLoggedIn");
     router.push("/");
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6 relative">
-      <div className="flex justify-between items-center mb-6 max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-white">
-          Hello {userName} 👋
-        </h1>
-        <Button
-          className="bg-red-600 hover:bg-red-700 text-white px-13 py-8"
-          onClick={() => setShowLogoutConfirm(true)}
-        >
-          🚪 Log Out
-        </Button>
-      </div>
+    <div className="min-h-screen w-full bg-gradient-to-b from-[#EAF2FF] to-[#CFE3FF] px-4 py-10">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="rounded-[2rem] bg-white shadow-2xl shadow-black/10 p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-extrabold text-[#0F172A]">{greeting}</h1>
+              <p className="mt-1 text-sm text-[#475569]">
+                Clear overview. Big buttons. Simple actions.
+              </p>
+            </div>
 
-      <div className="grid gap-8 max-w-4xl mx-auto">
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-2xl bg-[#F1F5F9] px-4 py-3 text-sm font-semibold text-[#0F172A] hover:bg-[#E2E8F0] focus:outline-none focus:ring-4 focus:ring-black/10"
+            >
+              Logout
+            </button>
+          </div>
 
-        {/* BALANCE CARD */}
-        <Card
-          className="cursor-pointer hover:scale-[1.02] transition border-4 border-blue-500"
-          onClick={() => {
-            router.push("/balance");
-          }}
-        >
-          <CardContent className="p-10 text-center">
-            <h2 className="text-2xl font-semibold">💰 My Money</h2>
-            <p className="text-5xl font-bold mt-4">€{balance.toFixed(2)}</p>
-            <p className="text-lg mt-2 text-gray-600">Tap to manage your money</p>
-          </CardContent>
-        </Card>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-black/10 bg-[#F8FAFC] p-5">
+              <div className="text-sm font-semibold text-[#475569]">Balance</div>
+              <div className="mt-2 text-2xl font-extrabold text-[#0F172A]">€{data.balance.toFixed(2)}</div>
+              <div className="mt-3 inline-flex rounded-xl bg-[#DCFCE7] px-3 py-2 text-sm font-semibold text-[#166534]">
+                Safe (green)
+              </div>
+            </div>
 
-        {/* SAVINGS CARD */}
-        <Card
-          className="cursor-pointer hover:scale-[1.02] transition border-4 border-green-500"
-          onClick={() => speak(`You have saved ${savings.toFixed(2)} euros`)}
-        >
-          <Link href="/savings" className="block">
-            <CardContent className="p-10 text-center">
-              <h2 className="text-2xl font-semibold">💎 My Savings</h2>
-              <p className="text-5xl font-bold mt-4 text-green-700">€{savings.toFixed(2)}</p>
-            </CardContent>
-          </Link>
-        </Card>
+            <div className="rounded-2xl border border-black/10 bg-[#F8FAFC] p-5">
+              <div className="text-sm font-semibold text-[#475569]">Savings</div>
+              <div className="mt-2 text-2xl font-extrabold text-[#0F172A]">€{data.savings.toFixed(2)}</div>
+              <div className="mt-3 inline-flex rounded-xl bg-[#DBEAFE] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">
+                Goals (blue)
+              </div>
+            </div>
 
-        {/* SPENDING CARD */}
-        <Card
-          className="cursor-pointer hover:scale-[1.02] transition border-4 border-red-500"
-          onClick={() => speak(`You have spent ${spent.toFixed(2)} euros`)}
-        >
-          <Link href="/spent" className="block">
-            <CardContent className="p-10 text-center">
-              <h2 className="text-2xl font-semibold">🧾 Money I Spent</h2>
-              <p className="text-5xl font-bold mt-4 text-red-600">€{spent.toFixed(2)}</p>
-              
-            </CardContent>
-          </Link>
-        </Card>
-
-      </div>
-
-      {/* LOGOUT CONFIRM MODAL */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4">
-            <p className="text-xl font-semibold">Are you sure you want to log out?</p>
-            <div className="flex justify-around mt-4">
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2"
-                onClick={logout}
-              >
-                Yes
-              </Button>
-              <Button
-                className="bg-gray-300 hover:bg-gray-400 text-black px-6 py-2"
-                onClick={() => setShowLogoutConfirm(false)}
-              >
-                No
-              </Button>
+            <div className="rounded-2xl border border-black/10 bg-[#F8FAFC] p-5">
+              <div className="text-sm font-semibold text-[#475569]">Spent</div>
+              <div className="mt-2 text-2xl font-extrabold text-[#0F172A]">€{data.spent.toFixed(2)}</div>
+              <div className="mt-3 inline-flex rounded-xl bg-[#FEE2E2] px-3 py-2 text-sm font-semibold text-[#991B1B]">
+                Watch (red)
+              </div>
             </div>
           </div>
+
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Link
+              href="/balance"
+              className="rounded-2xl bg-[#2563EB] text-white text-center py-4 font-semibold hover:bg-[#1D4ED8] focus:outline-none focus:ring-4 focus:ring-black/10"
+            >
+              Update Balance
+            </Link>
+
+            <Link
+              href="/savings"
+              className="rounded-2xl bg-[#0EA5E9] text-white text-center py-4 font-semibold hover:bg-[#0284C7] focus:outline-none focus:ring-4 focus:ring-black/10"
+            >
+              Add to Savings
+            </Link>
+
+            <Link
+              href="/spent"
+              className="rounded-2xl bg-[#F97316] text-white text-center py-4 font-semibold hover:bg-[#EA580C] focus:outline-none focus:ring-4 focus:ring-black/10"
+            >
+              Log Spending
+            </Link>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-black/10 bg-[#F8FAFC] p-5">
+            <div className="text-sm font-semibold text-[#0F172A]">Next step</div>
+            <p className="mt-1 text-sm text-[#475569]">
+              We’ll replace this with your “Quick Transaction” + “Recent Activity” once the theme is locked.
+            </p>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
