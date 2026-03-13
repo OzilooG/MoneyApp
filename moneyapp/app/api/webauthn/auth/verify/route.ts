@@ -1,5 +1,3 @@
-// FILE: app/api/webauthn/auth/verify/route.ts
-
 import { NextResponse } from "next/server";
 import {
   verifyAuthenticationResponse,
@@ -12,9 +10,10 @@ import { getUserByName, upsertUser } from "@/lib/webauthnStore";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const body              = await req.json().catch(() => ({}));
-  const userName          = String(body?.userName ?? "").trim();
-  const assertionResponse = body?.assertionResponse as AuthenticationResponseJSON | undefined;
+  const body = await req.json().catch(() => ({}));
+  const userName = String(body?.userName ?? "").trim();
+  const assertionResponse =
+    body?.assertionResponse as AuthenticationResponseJSON | undefined;
 
   if (!userName || !assertionResponse) {
     return NextResponse.json(
@@ -23,10 +22,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const rpID           = process.env.RP_ID ?? "localhost";
+  const rpID = process.env.RP_ID ?? "localhost";
   const expectedOrigin = req.headers.get("origin") ?? "http://localhost:3000";
 
-  const user = getUserByName(userName);
+  const user = await getUserByName(userName);
+
+  console.log("[auth/verify] fetched user:", JSON.stringify(user ?? null));
+  console.log("[auth/verify] assertionResponse.id:", assertionResponse.id);
+
   if (!user?.currentAuthChallenge) {
     return NextResponse.json(
       { verified: false, error: "No stored challenge. Try Face ID again." },
@@ -34,7 +37,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const stored = user.credentials.find((c) => c.credentialID === assertionResponse.id);
+  const stored = user.credentials.find(
+    (c) => c.credentialID === assertionResponse.id
+  );
+
   if (!stored) {
     return NextResponse.json(
       { verified: false, error: "Credential not found for this user." },
@@ -42,22 +48,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // Explicitly type as WebAuthnCredential so TS resolves all field names correctly.
-  // Buffer.from with "base64url" encoding handles the base64url string directly —
-  // no manual replace() needed. Uint8Array.from() produces a clean Uint8Array (not Buffer).
   const credential: WebAuthnCredential = {
-    id:         stored.credentialID,
-    publicKey:  Uint8Array.from(Buffer.from(stored.publicKey, "base64url")),
-    counter:    stored.counter,
+    id: stored.credentialID,
+    publicKey: Uint8Array.from(Buffer.from(stored.publicKey, "base64url")),
+    counter: stored.counter,
     transports: (stored.transports ?? []) as AuthenticatorTransportFuture[],
   };
 
   try {
     const verification = await verifyAuthenticationResponse({
-      response:          assertionResponse,
+      response: assertionResponse,
       expectedChallenge: user.currentAuthChallenge,
       expectedOrigin,
-      expectedRPID:      rpID,
+      expectedRPID: rpID,
       credential,
     });
 
@@ -65,9 +68,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ verified: false }, { status: 200 });
     }
 
-    stored.counter            = verification.authenticationInfo.newCounter;
+    stored.counter = verification.authenticationInfo.newCounter;
     user.currentAuthChallenge = undefined;
-    upsertUser(user);
+    await upsertUser(user);
 
     return NextResponse.json({ verified: true });
   } catch (err: unknown) {

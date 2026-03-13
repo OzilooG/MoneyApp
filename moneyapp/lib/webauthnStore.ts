@@ -1,21 +1,7 @@
 // FILE: lib/webauthnStore.ts
-//
-// File-backed credential store.
-//
-// WHY: The in-memory Map (even with global.__webauthnStore) resets whenever
-// Next.js fully restarts the Node process (e.g. after changing a route file,
-// or just running `npm run dev` fresh). That means registered credentials
-// disappear and Face ID login always fails with "Could not start Face ID."
-//
-// FIX: We persist the store to a JSON file at `.webauthn-store.json` in the
-// project root. Reads happen on every request; writes happen after mutations.
-// This is fine for dev — replace with a real DB (SQLite/Postgres) for prod.
 
-import fs   from "fs";
-import path from "path";
+import { MongoClient, type Collection } from "mongodb";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type StoredCredential = {
   credentialID: string;
@@ -25,64 +11,60 @@ export type StoredCredential = {
 };
 
 export type StoredUser = {
-  id:                   string;
-  name:                 string;
+  id:                    string;
+  name:                  string;
   currentChallenge?:     string;
   currentAuthChallenge?: string;
-  credentials:          StoredCredential[];
+  credentials:           StoredCredential[];
 };
 
-// ─── File path ────────────────────────────────────────────────────────────────
+declare global {
+  var __mongoClient: MongoClient | undefined;
+}
 
-// Stored at project root — gitignore this file in production!
-const STORE_PATH = path.join(process.cwd(), ".webauthn-store.json");
-
-// ─── Read / Write ─────────────────────────────────────────────────────────────
-
-function readStore(): Map<string, StoredUser> {
-  try {
-    if (!fs.existsSync(STORE_PATH)) return new Map();
-    const raw  = fs.readFileSync(STORE_PATH, "utf-8");
-    const data = JSON.parse(raw) as Record<string, StoredUser>;
-    return new Map(Object.entries(data));
-  } catch {
-    // If the file is corrupted, start fresh
-    return new Map();
+async function getCollection(): Promise<Collection<StoredUser>> {
+  if (!process.env.MONGODB_URI) {
+    throw new Error("MONGODB_URI environment variable is not set");
   }
-}
-
-function writeStore(map: Map<string, StoredUser>): void {
-  try {
-    const obj = Object.fromEntries(map.entries());
-    fs.writeFileSync(STORE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (e) {
-    console.error("[webauthnStore] Failed to write store:", e);
+  if (!global.__mongoClient) {
+    global.__mongoClient = new MongoClient(process.env.MONGODB_URI);
+    await global.__mongoClient.connect();
   }
+  return global.__mongoClient.db("moneyapp").collection<StoredUser>("users");
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export function getUserByName(name: string): StoredUser | undefined {
-  return readStore().get(name);
+// MongoDB adds _id to returned documents — strip it so $set never tries to update it
+function stripMongoId(doc: Record<string, unknown>): StoredUser {
+  const { _id, ...rest } = doc;
+  void _id;
+  return rest as StoredUser;
 }
 
-export function upsertUser(user: StoredUser): void {
-  const map = readStore();
-  map.set(user.name, user);
-  writeStore(map);
+export async function getUserByName(name: string): Promise<StoredUser | undefined> {
+  const col  = await getCollection();
+  const user = await col.findOne({ name });
+  return user ? stripMongoId(user as unknown as Record<string, unknown>) : undefined;
 }
 
-export function ensureUser(name: string): StoredUser {
-  const map      = readStore();
-  const existing = map.get(name);
-  if (existing) return existing;
+export async function upsertUser(user: StoredUser): Promise<void> {
+  const col = await getCollection();
+  await col.updateOne(
+    { name: user.name },
+    { $set: user },
+    { upsert: true }
+  );
+}
+
+export async function ensureUser(name: string): Promise<StoredUser> {
+  const col      = await getCollection();
+  const existing = await col.findOne({ name });
+  if (existing) return stripMongoId(existing as unknown as Record<string, unknown>);
 
   const created: StoredUser = {
     id:          crypto.randomUUID(),
     name,
     credentials: [],
   };
-  map.set(name, created);
-  writeStore(map);
+  await col.insertOne({ ...created });
   return created;
 }

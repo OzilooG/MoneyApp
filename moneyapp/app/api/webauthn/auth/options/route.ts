@@ -1,5 +1,3 @@
-// FILE: app/api/webauthn/auth/options/route.ts
-
 import { NextResponse } from "next/server";
 import {
   generateAuthenticationOptions,
@@ -11,16 +9,16 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const body     = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
     const userName = String(body?.userName ?? "").trim();
 
     if (!userName) {
       return NextResponse.json({ error: "userName is required" }, { status: 400 });
     }
 
-    const user = getUserByName(userName);
+    const user = await getUserByName(userName);
 
-    console.log("[auth/options] user:", JSON.stringify(user ?? null));
+    console.log("[auth/options] fetched user:", JSON.stringify(user ?? null));
 
     if (!user || user.credentials.length === 0) {
       return NextResponse.json(
@@ -31,30 +29,32 @@ export async function POST(req: Request) {
 
     const rpID = process.env.RP_ID ?? "localhost";
 
-    // Defensively filter out any malformed credentials where credentialID
-    // is not a plain string (can happen if old Uint8Array data was serialised)
     const validCredentials = user.credentials.filter((c) => {
-      const valid = typeof c.credentialID === "string" && c.credentialID.length > 0;
+      const valid =
+        typeof c.credentialID === "string" && c.credentialID.length > 0;
+
       if (!valid) {
-        console.error("[auth/options] Skipping malformed credential:", JSON.stringify(c));
+        console.error("[auth/options] malformed credential:", JSON.stringify(c));
       }
+
       return valid;
     });
 
     if (validCredentials.length === 0) {
       return NextResponse.json(
-        { error: "No valid Face ID credentials found. Please delete this account and register again." },
+        {
+          error:
+            "No valid Face ID credentials found. Please delete this account and register again.",
+        },
         { status: 400 }
       );
     }
 
     const allowCredentials = validCredentials.map((c) => ({
-      id:         c.credentialID,  // Base64URLString — must be a plain string
-      type:       "public-key" as const,
+      id: c.credentialID,
+      type: "public-key" as const,
       transports: (c.transports ?? []) as AuthenticatorTransportFuture[],
     }));
-
-    console.log("[auth/options] allowCredentials:", JSON.stringify(allowCredentials));
 
     const options = await generateAuthenticationOptions({
       rpID,
@@ -63,10 +63,18 @@ export async function POST(req: Request) {
     });
 
     user.currentAuthChallenge = options.challenge;
-    upsertUser(user);
+
+    console.log("[auth/options] saving challenge:", options.challenge);
+
+    await upsertUser(user);
+
+    const savedUser = await getUserByName(userName);
+    console.log(
+      "[auth/options] saved user after upsert:",
+      JSON.stringify(savedUser ?? null)
+    );
 
     return NextResponse.json(options);
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[auth/options] CRASH:", message);
