@@ -38,9 +38,92 @@ function getStoredPin(name: string): string | null {
 
 function removeUser(name: string) {
   localStorage.removeItem(`user-${name}`);
+  localStorage.removeItem("userId");
+  localStorage.removeItem("userName");
 }
 
-// ─── PIN dots indicator ───────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function storeUserId(name: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/user?name=${encodeURIComponent(name)}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json?.userId) localStorage.setItem("userId", json.userId);
+  } catch {}
+}
+
+async function deleteAccountFromMongo(name: string): Promise<void> {
+  try {
+    await fetch(`/api/user?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+  } catch {}
+}
+
+// ─── Face ID SVG icon ─────────────────────────────────────────────────────────
+
+function FaceIdIcon({ color = "#2E5BFF", size = 56, strokeWidth = 3.5 }: {
+  color?:       string;
+  size?:        number;
+  strokeWidth?: number;
+}) {
+  const sw  = strokeWidth;
+  const sw2 = Math.max(sw - 0.5, 2);
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Corner brackets */}
+      <path d="M8 20V10a2 2 0 0 1 2-2h10"  stroke={color} strokeWidth={sw}  strokeLinecap="round"/>
+      <path d="M44 8h10a2 2 0 0 1 2 2v10"  stroke={color} strokeWidth={sw}  strokeLinecap="round"/>
+      <path d="M56 44v10a2 2 0 0 1-2 2H44" stroke={color} strokeWidth={sw}  strokeLinecap="round"/>
+      <path d="M20 56H10a2 2 0 0 1-2-2V44" stroke={color} strokeWidth={sw}  strokeLinecap="round"/>
+      {/* Eyes */}
+      <circle cx="23" cy="26" r="2.8" fill={color}/>
+      <circle cx="41" cy="26" r="2.8" fill={color}/>
+      {/* Nose */}
+      <path d="M32 28v5" stroke={color} strokeWidth={sw2} strokeLinecap="round"/>
+      {/* Smile */}
+      <path d="M24 39c2 3 14 3 16 0" stroke={color} strokeWidth={sw2} strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+// ─── Fingerprint SVG icon ─────────────────────────────────────────────────────
+
+function FingerprintIcon({ color = "#2E5BFF", size = 56, strokeWidth = 3.5 }: {
+  color?:       string;
+  size?:        number;
+  strokeWidth?: number;
+}) {
+  const sw = strokeWidth;
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 32c0-11 9-20 20-20s20 9 20 20"                             stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+      <path d="M18 32c0-7.7 6.3-14 14-14s14 6.3 14 14c0 5-1.5 9.5-4 13"     stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+      <path d="M24 32c0-4.4 3.6-8 8-8s8 3.6 8 8c0 6-2 11-5 15"              stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+      <circle cx="32" cy="32" r="2.8" fill={color}/>
+      <path d="M20 48c3-4 5-9 5-16"                                           stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+// ─── Shared biometric icon row ────────────────────────────────────────────────
+
+function BiometricIcons() {
+  return (
+    <div className="flex items-center justify-center gap-6 py-2">
+      <div className="flex flex-col items-center gap-1">
+        <FaceIdIcon />
+        <span className="text-[10px] font-semibold text-slate-400">Face ID</span>
+      </div>
+      <div className="text-slate-300 text-xl font-light">/</div>
+      <div className="flex flex-col items-center gap-1">
+        <FingerprintIcon />
+        <span className="text-[10px] font-semibold text-slate-400">Touch ID</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN dots ─────────────────────────────────────────────────────────────────
 
 function PinDots({ pin }: { pin: string }) {
   return (
@@ -87,7 +170,6 @@ function Numpad({ onDigit, onBack, onClear, onSubmit, submitLabel }: {
           ⌫
         </button>
       </div>
-
       {onSubmit && (
         <div className="mt-3">
           <button type="button" onClick={onSubmit}
@@ -103,8 +185,8 @@ function Numpad({ onDigit, onBack, onClear, onSubmit, submitLabel }: {
 // ─── Primary button ───────────────────────────────────────────────────────────
 
 function Btn({ children, onClick, disabled = false, variant = "blue" }: {
-  children: React.ReactNode;
-  onClick:  () => void;
+  children:  React.ReactNode;
+  onClick:   () => void;
   disabled?: boolean;
   variant?:  "blue" | "white";
 }) {
@@ -130,12 +212,10 @@ export default function Page() {
   const [msg, setMsg]         = useState<Msg | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Register
   const [regStep, setRegStep] = useState<RegStep>("name_pin");
   const [regName, setRegName] = useState("");
   const [regPin, setRegPin]   = useState("");
 
-  // Login
   const [selUser, setSelUser]           = useState("");
   const [loginPin, setLoginPin]         = useState("");
   const [showPinEntry, setShowPinEntry] = useState(false);
@@ -159,7 +239,7 @@ export default function Page() {
   const advanceToFaceId = () => {
     setMsg(null);
     const name = regName.trim();
-    if (name.length < 2)  { setMsg({ type: "err", text: "Name must be at least 2 characters." }); return; }
+    if (name.length < 2)     { setMsg({ type: "err", text: "Name must be at least 2 characters." }); return; }
     if (regPin.length !== 4) { setMsg({ type: "err", text: "Please enter a 4-digit PIN." }); return; }
     if (users.some((u) => u.name.toLowerCase() === name.toLowerCase())) {
       setMsg({ type: "err", text: "That name is already taken." }); return;
@@ -178,7 +258,6 @@ export default function Page() {
       const options = await optRes.json().catch(() => ({}));
       if (!optRes.ok) { setMsg({ type: "err", text: options?.error ?? "Could not start Face ID setup." }); return; }
 
-      // v13 REQUIRES { optionsJSON: options }
       const attestationResponse = await startRegistration({ optionsJSON: options });
 
       const verifyRes  = await fetch("/api/webauthn/register/verify", {
@@ -216,7 +295,6 @@ export default function Page() {
       const options = await optRes.json().catch(() => ({}));
       if (!optRes.ok) { setMsg({ type: "err", text: options?.error ?? "Could not start Face ID." }); return; }
 
-      // v13 REQUIRES { optionsJSON: options }
       const assertionResponse = await startAuthentication({ optionsJSON: options });
 
       const verifyRes  = await fetch("/api/webauthn/auth/verify", {
@@ -229,6 +307,7 @@ export default function Page() {
       }
 
       localStorage.setItem("userName", selUser);
+      await storeUserId(selUser);
       setMsg({ type: "ok", text: "✅ Face ID verified. Redirecting…" });
       setTimeout(() => router.push("/main"), 350);
     } catch (e: unknown) {
@@ -240,23 +319,34 @@ export default function Page() {
     } finally { setLoading(false); }
   };
 
-  const handlePinLogin = () => {
+  const handlePinLogin = async () => {
     setMsg(null);
-    if (!selUser)             { setMsg({ type: "err", text: "Select an account first." }); return; }
-    if (loginPin.length !== 4){ setMsg({ type: "err", text: "Enter your 4-digit PIN." }); return; }
+    if (!selUser)              { setMsg({ type: "err", text: "Select an account first." }); return; }
+    if (loginPin.length !== 4) { setMsg({ type: "err", text: "Enter your 4-digit PIN." }); return; }
     const saved = getStoredPin(selUser);
-    if (!saved)               { setMsg({ type: "err", text: "Account not found." }); refreshUsers(); return; }
-    if (saved !== loginPin)   { setMsg({ type: "err", text: "Incorrect PIN. Try again." }); setLoginPin(""); return; }
+    if (!saved)                { setMsg({ type: "err", text: "Account not found." }); refreshUsers(); return; }
+    if (saved !== loginPin)    { setMsg({ type: "err", text: "Incorrect PIN. Try again." }); setLoginPin(""); return; }
+
     localStorage.setItem("userName", selUser);
+    await storeUserId(selUser);
     setMsg({ type: "ok", text: "✅ Logged in. Redirecting…" });
     setTimeout(() => router.push("/main"), 300);
+  };
+
+  // ── DELETE ACCOUNT ────────────────────────────────────────────────────────────
+
+  const handleDeleteAccount = async () => {
+    const name = selUser;
+    removeUser(name);
+    refreshUsers();
+    setMsg({ type: "ok", text: "Account deleted." });
+    await deleteAccountFromMongo(name);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen w-full px-4 py-8 flex items-center justify-center bg-gradient-to-b from-[#5878FF] via-[#335BFF] to-[#102A9A]">
-      {/* Wide square-ish glass card — max-w-2xl keeps it wide not tall */}
       <div className="w-full max-w-2xl rounded-[2.6rem] bg-white/10 border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl">
 
         {/* Header */}
@@ -305,8 +395,7 @@ export default function Page() {
                     </div>
                   )}
                 {mode === "login" && selUser && (
-                  <button type="button"
-                    onClick={() => { removeUser(selUser); setMsg({ type:"ok", text:"Account deleted." }); refreshUsers(); }}
+                  <button type="button" onClick={handleDeleteAccount}
                     className="mt-2 text-xs font-bold text-[#B42318] hover:underline">
                     Delete selected account
                   </button>
@@ -325,7 +414,6 @@ export default function Page() {
               {/* ═══ REGISTER ═══ */}
               {mode === "register" && (
                 <>
-                  {/* Step tracker */}
                   <div className="flex items-center gap-2">
                     {([["Name & PIN","name_pin"],[" Face ID","faceid"]] as const).map(([label, step], idx) => {
                       const active = regStep === step;
@@ -342,10 +430,8 @@ export default function Page() {
                     })}
                   </div>
 
-                  {/* Step 1 */}
                   {regStep === "name_pin" && (
                     <div className="space-y-4">
-                      {/* Two-column layout on wider card: name field left, PIN dots right */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="rounded-2xl border border-slate-100 bg-[#F7F9FF] p-4">
                           <p className="text-xs font-bold text-slate-600 mb-2">Your name</p>
@@ -359,7 +445,6 @@ export default function Page() {
                           <p className="text-xs text-center text-slate-400 mt-1">Use keypad below</p>
                         </div>
                       </div>
-
                       <Numpad
                         onDigit={(d) => { if (regPin.length < 4) setRegPin((p) => p + d); }}
                         onBack={() => setRegPin((p) => p.slice(0,-1))}
@@ -370,13 +455,12 @@ export default function Page() {
                     </div>
                   )}
 
-                  {/* Step 2 */}
                   {regStep === "faceid" && (
                     <div className="space-y-4">
-                      <div className="rounded-2xl border border-slate-100 bg-[#F7F9FF] p-6 text-center space-y-2">
-                        <div className="text-5xl">🔐</div>
+                      <div className="rounded-2xl border border-slate-100 bg-[#F7F9FF] p-6 text-center space-y-3">
+                        <BiometricIcons />
                         <p className="text-sm font-extrabold text-slate-800">
-                          Set up Face ID for <span className="text-[#2E5BFF]">{regName.trim()}</span>
+                          Set up passkey for <span className="text-[#2E5BFF]">{regName.trim()}</span>
                         </p>
                         <p className="text-xs text-slate-500 max-w-xs mx-auto">
                           Creates a secure passkey saved to your device. Log in instantly — no password to remember.
@@ -400,9 +484,16 @@ export default function Page() {
                     ? <p className="text-sm text-slate-400 text-center py-4">👆 Select a saved account above.</p>
                     : (
                       <>
-                        <Btn onClick={handleFaceIdLogin} disabled={loading}>
-                          {loading ? "Checking…" : `Use Face ID  ·  ${selUser}`}
-                        </Btn>
+                        {/* Face ID login button — icon is larger and thicker */}
+                        <button type="button" onClick={handleFaceIdLogin} disabled={loading}
+                          className="w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[0.98] focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed bg-[#2E5BFF] text-white shadow-[0_18px_40px_rgba(46,91,255,0.35)] hover:bg-[#234DFF] focus:ring-[#2E5BFF]/25">
+                          {loading ? "Checking…" : (
+                            <span className="flex items-center justify-center gap-3">
+                              <FaceIdIcon color="white" size={36} strokeWidth={5} />
+                              Use Face ID · {selUser}
+                            </span>
+                          )}
+                        </button>
 
                         <div className="flex items-center gap-3">
                           <div className="flex-1 h-px bg-slate-200" />
