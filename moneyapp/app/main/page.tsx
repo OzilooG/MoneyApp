@@ -319,6 +319,7 @@ export default function DashboardPage() {
             {userName || "there"} 👋
           </h1>
         </div>
+        
         <button
           onClick={() => {
             localStorage.removeItem("userName");
@@ -333,6 +334,7 @@ export default function DashboardPage() {
         >
           {initials}
         </button>
+          <span className="text-[10px] text-white/50 font-medium">Log out</span>
       </div>
 
       <motion.div
