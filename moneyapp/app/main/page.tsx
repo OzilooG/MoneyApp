@@ -345,7 +345,6 @@ export default function DashboardPage() {
         >
           Sign out
         </button>
-          <span className="text-[10px] text-white/50 font-medium">Log out</span>
       </div>
 
       <motion.div
