@@ -23,8 +23,18 @@ function getStoredUsers(): SavedUser[] {
     .map((name, i) => ({ name, emoji: EMOJIS[i % EMOJIS.length] }));
 }
 
-function saveUser(name: string, pin: string) {
-  localStorage.setItem(`user-${name}`, JSON.stringify({ pin }));
+function saveUser(name: string, pin: string, hasFaceId = false) {
+  localStorage.setItem(`user-${name}`, JSON.stringify({ pin, hasFaceId }));
+}
+
+function getUserHasFaceId(name: string): boolean {
+  try {
+    const raw = localStorage.getItem(`user-${name}`);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    // Existing accounts without the flag default to true (they were registered with Face ID)
+    return d?.hasFaceId !== false;
+  } catch { return false; }
 }
 
 function getStoredPin(name: string): string | null {
@@ -269,7 +279,7 @@ export default function Page() {
         setMsg({ type: "err", text: verifyJson?.error ?? "Face ID setup failed." }); return;
       }
 
-      saveUser(name, regPin);
+      saveUser(name, regPin, true);
       refreshUsers();
       setMsg({ type: "ok", text: "✅ Account created! Switching to login…" });
       setTimeout(() => { setSelUser(name); switchMode("login"); }, 1000);
@@ -279,6 +289,14 @@ export default function Page() {
         ? "Face ID was cancelled. Tap the button to try again."
         : text });
     } finally { setLoading(false); }
+  };
+
+  const handleSkipFaceId = () => {
+    const name = regName.trim();
+    saveUser(name, regPin, false);
+    refreshUsers();
+    setMsg({ type: "ok", text: "✅ Account created! Switching to login…" });
+    setTimeout(() => { setSelUser(name); switchMode("login"); }, 1000);
   };
 
   // ── LOGIN ─────────────────────────────────────────────────────────────────────
@@ -469,6 +487,9 @@ export default function Page() {
                       <Btn onClick={handleFaceIdSetup} disabled={loading}>
                         {loading ? "Setting up…" : "Set up Face ID / Touch ID"}
                       </Btn>
+                      <Btn variant="white" onClick={handleSkipFaceId} disabled={loading}>
+                        Skip → Use PIN only
+                      </Btn>
                       <Btn variant="white" onClick={() => { setRegStep("name_pin"); setMsg(null); }} disabled={loading}>
                         ← Back
                       </Btn>
@@ -484,29 +505,47 @@ export default function Page() {
                     ? <p className="text-sm text-slate-400 text-center py-4">👆 Select a saved account above.</p>
                     : (
                       <>
-                        {/* Face ID login button — icon is larger and thicker */}
-                        <button type="button" onClick={handleFaceIdLogin} disabled={loading}
-                          className="w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[0.98] focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed bg-[#2E5BFF] text-white shadow-[0_18px_40px_rgba(46,91,255,0.35)] hover:bg-[#234DFF] focus:ring-[#2E5BFF]/25">
-                          {loading ? "Checking…" : (
-                            <span className="flex items-center justify-center gap-3">
-                              <FaceIdIcon color="white" size={36} strokeWidth={5} />
-                              Use Face ID · {selUser}
-                            </span>
-                          )}
-                        </button>
+                        {getUserHasFaceId(selUser) ? (
+                          <>
+                            {/* Face ID login button */}
+                            <button type="button" onClick={handleFaceIdLogin} disabled={loading}
+                              className="w-full rounded-2xl py-4 text-base font-extrabold transition active:scale-[0.98] focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed bg-[#2E5BFF] text-white shadow-[0_18px_40px_rgba(46,91,255,0.35)] hover:bg-[#234DFF] focus:ring-[#2E5BFF]/25">
+                              {loading ? "Checking…" : (
+                                <span className="flex items-center justify-center gap-3">
+                                  <FaceIdIcon color="white" size={36} strokeWidth={5} />
+                                  Use Face ID · {selUser}
+                                </span>
+                              )}
+                            </button>
 
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-px bg-slate-200" />
-                          <span className="text-xs text-slate-400 font-semibold">or</span>
-                          <div className="flex-1 h-px bg-slate-200" />
-                        </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 h-px bg-slate-200" />
+                              <span className="text-xs text-slate-400 font-semibold">or</span>
+                              <div className="flex-1 h-px bg-slate-200" />
+                            </div>
 
-                        <Btn variant="white"
-                          onClick={() => { setMsg(null); setShowPinEntry((v) => !v); setLoginPin(""); }}>
-                          {showPinEntry ? "Hide PIN keypad" : "Enter PIN instead"}
-                        </Btn>
+                            <Btn variant="white"
+                              onClick={() => { setMsg(null); setShowPinEntry((v) => !v); setLoginPin(""); }}>
+                              {showPinEntry ? "Hide PIN keypad" : "Enter PIN instead"}
+                            </Btn>
 
-                        {showPinEntry && (
+                            {showPinEntry && (
+                              <div className="space-y-3">
+                                <div className="rounded-2xl bg-[#F7F9FF] border border-slate-100 px-4">
+                                  <PinDots pin={loginPin} />
+                                </div>
+                                <Numpad
+                                  onDigit={(d) => { if (loginPin.length < 4) setLoginPin((p) => p + d); }}
+                                  onBack={() => setLoginPin((p) => p.slice(0,-1))}
+                                  onClear={() => setLoginPin("")}
+                                  onSubmit={handlePinLogin}
+                                  submitLabel="Login with PIN"
+                                />
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          /* PIN-only login */
                           <div className="space-y-3">
                             <div className="rounded-2xl bg-[#F7F9FF] border border-slate-100 px-4">
                               <PinDots pin={loginPin} />

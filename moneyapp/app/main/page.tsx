@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
@@ -12,6 +12,7 @@ import {
   type UserData,
 } from "@/lib/moneyData";
 import { fetchFromMongo, saveAndSync } from "@/lib/financeSync";
+import { toast, Toaster } from "sonner";
 
 const stagger: Variants = {
   hidden: {},
@@ -46,9 +47,11 @@ const fadeIn: Variants = {
 };
 
 function getEmoji(pct: number) {
-  if (pct <= 50) return { emoji: "😁", label: "Great", color: "#16a34a" };
-  if (pct <= 75) return { emoji: "😊", label: "Good", color: "#65a30d" };
-  return { emoji: "😐", label: "Watch this", color: "#d97706" };
+  if (pct < 50) return { emoji: "😁", label: "Great", color: "#16a34a" };
+  if (pct < 75) return { emoji: "😊", label: "Good", color: "#65a30d" };
+  if (pct < 90) return { emoji: "😐", label: "Watch this", color: "#d97706" };
+  if (pct < 100) return { emoji: "😟", label: "Almost over budget!", color: "#ea580c" };
+  return { emoji: "😱", label: "Over budget!", color: "#dc2626" };
 }
 
 function getSavingsEmoji(pct: number) {
@@ -121,6 +124,8 @@ export default function DashboardPage() {
   const [savingsGoal, setSavingsGoal] = useState(0);
   const [budget, setBudget] = useState(0);
 
+  const overBudgetToastShown = useRef(false);
+
   const [showIncomePanel, setShowIncomePanel] = useState(false);
   const [incomeAmount, setIncomeAmount] = useState("");
   const [incomeNote, setIncomeNote] = useState("");
@@ -159,6 +164,16 @@ export default function DashboardPage() {
   const balance = deriveCurrentBalance(startingBalance, transactions);
   const spentPct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
 
+  useEffect(() => {
+    if (spentPct >= 100 && !overBudgetToastShown.current) {
+      overBudgetToastShown.current = true;
+      toast.error("You've gone over budget this month!", {
+        description: "Consider reviewing your spending.",
+        duration: 6000,
+      });
+    }
+  }, [spentPct]);
+
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
@@ -168,13 +183,7 @@ export default function DashboardPage() {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const initials =
-    userName
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2) || "?";
+
 
   function currentData(): UserData {
     return {
@@ -236,6 +245,8 @@ export default function DashboardPage() {
   }
 
   return (
+    <>
+    <Toaster position="top-center" richColors />
     <div
       className="min-h-screen w-full"
       style={{
@@ -326,13 +337,13 @@ export default function DashboardPage() {
             localStorage.removeItem("userId");
             router.push("/");
           }}
-          className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-sm"
+          className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
           style={{
             background: "rgba(255,255,255,0.18)",
             border: "1.5px solid rgba(255,255,255,0.3)",
           }}
         >
-          {initials}
+          Sign out
         </button>
           <span className="text-[10px] text-white/50 font-medium">Log out</span>
       </div>
@@ -584,7 +595,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col gap-2">
                   {categories.slice(0, 3).map((c) => {
                     const pct = spent > 0 ? Math.round((c.spent / spent) * 100) : 0;
-                    const { emoji, label, color } = getEmoji(pct);
+                    const { emoji, label, color } = getEmoji(spentPct);
 
                     return (
                       <div
@@ -620,6 +631,30 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <p className="text-sm text-slate-400 italic">No spending recorded yet</p>
+              )}
+              {budget > 0 && spentPct >= 100 && (
+                <div
+                  className="mt-3 rounded-2xl p-3 flex items-center gap-2"
+                  style={{ background: "#fee2e2", border: "1px solid #fca5a5" }}
+                >
+                  <span className="text-lg">😱</span>
+                  <div>
+                    <p className="text-sm font-extrabold text-red-700">You&apos;ve gone over budget!</p>
+                    <p className="text-xs text-red-500">You&apos;ve spent €{(spent - budget).toFixed(2)} more than your €{budget} budget.</p>
+                  </div>
+                </div>
+              )}
+              {budget > 0 && spentPct >= 90 && spentPct < 100 && (
+                <div
+                  className="mt-3 rounded-2xl p-3 flex items-center gap-2"
+                  style={{ background: "#fff7ed", border: "1px solid #fdba74" }}
+                >
+                  <span className="text-lg">😟</span>
+                  <div>
+                    <p className="text-sm font-extrabold text-orange-700">Almost over budget!</p>
+                    <p className="text-xs text-orange-500">Only €{(budget - spent).toFixed(2)} left of your €{budget} budget.</p>
+                  </div>
+                </div>
               )}
             </div>
           </motion.div>
@@ -797,5 +832,6 @@ export default function DashboardPage() {
         ))}
       </nav>
     </div>
+    </>
   );
 }

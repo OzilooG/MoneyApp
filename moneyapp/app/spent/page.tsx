@@ -145,16 +145,32 @@ export default function SpendingPage() {
           <p className="text-white/55 text-sm font-medium">My Money</p>
           <h1 className="text-white text-2xl font-extrabold mt-0.5">Spending 🧾</h1>
         </div>
-        <button
-          onClick={() => router.push("/main")}
-          className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
-          style={{
-            background: "rgba(255,255,255,0.18)",
-            border: "1.5px solid rgba(255,255,255,0.3)",
-          }}
-        >
-          ⌂ Home
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push("/main")}
+            className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            ⌂ Home
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem("userName");
+              localStorage.removeItem("userId");
+              router.push("/");
+            }}
+            className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="px-4 max-w-7xl mx-auto flex flex-col gap-4">

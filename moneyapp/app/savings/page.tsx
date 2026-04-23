@@ -130,16 +130,32 @@ export default function SavingsPage() {
           <p className="text-white/55 text-sm font-medium">My Money</p>
           <h1 className="text-white text-2xl font-extrabold mt-0.5">Savings 💎</h1>
         </div>
-        <button
-          onClick={() => router.push("/main")}
-          className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
-          style={{
-            background: "rgba(255,255,255,0.18)",
-            border: "1.5px solid rgba(255,255,255,0.3)",
-          }}
-        >
-          ⌂ Home
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push("/main")}
+            className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            ⌂ Home
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem("userName");
+              localStorage.removeItem("userId");
+              router.push("/");
+            }}
+            className="px-4 py-2 rounded-2xl font-semibold text-sm text-white"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+            }}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="px-4 max-w-7xl mx-auto flex flex-col gap-4">
@@ -265,22 +281,28 @@ export default function SavingsPage() {
           >
             <p className="font-extrabold text-slate-800 text-base mb-1">🎯 My savings goal</p>
             <p className="text-xs text-slate-400 mb-5">Set how much you want to save</p>
-            <p className="text-center text-5xl font-black text-slate-900 mb-5">€{goalDraft}</p>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <button
-                onClick={() => setGoalDraft(Math.max(goalDraft - 5, 0))}
-                className="py-5 rounded-2xl font-extrabold text-2xl transition-all active:scale-95"
-                style={{ background: "#fee2e2", color: "#dc2626" }}
-              >
-                − €5
-              </button>
-              <button
-                onClick={() => setGoalDraft(goalDraft + 5)}
-                className="py-5 rounded-2xl font-extrabold text-2xl transition-all active:scale-95"
-                style={{ background: "#f0fdf4", color: "#16a34a" }}
-              >
-                + €5
-              </button>
+            <div className="flex items-center justify-center mb-5">
+              <span className="text-4xl font-black text-slate-400 mr-1">€</span>
+              <input
+                type="number"
+                min={0}
+                value={goalDraft || ""}
+                onChange={(e) => setGoalDraft(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
+                className="text-5xl font-black text-slate-900 w-40 text-center bg-transparent outline-none border-b-2 border-slate-200 focus:border-green-500 transition-colors"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[10, 50, 100].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => setGoalDraft(goalDraft + amt)}
+                  className="py-3 rounded-2xl font-bold text-sm transition-all active:scale-95"
+                  style={{ background: "#f0fdf4", color: "#16a34a" }}
+                >
+                  +€{amt}
+                </button>
+              ))}
             </div>
             <button
               onClick={confirmGoal}
